@@ -17,8 +17,11 @@ def get_scaleo(wfs, scale_lim=33, waveletname = 'mexh'):
         scales=scales,
         wavelet=waveletname,
         sampling_period=1/100)
-        power = np.log2(abs(coefficients))
-        norm_power= (power - np.min(power)) / (np.max(power) - np.min(power))
+        power = np.log2(abs(coefficients)+1e-10)
+        if np.max(power) - np.min(power) > 0:
+            norm_power= (power - np.min(power)) / (np.max(power) - np.min(power))
+        else:
+            norm_power = 0*power
         all_powers.extend(np.array(norm_power))
     return np.array(all_powers)
 
