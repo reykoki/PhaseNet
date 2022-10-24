@@ -23,11 +23,11 @@ class ModelConfig:
   decay_rate = 0.9
   drop_rate = 0.0
   summary = True
-  
-  X_shape = [3000, 1, 3]
-  n_channel = X_shape[-1]
-  Y_shape = [3000, 1, 3]
-  n_class = Y_shape[-1]
+
+  n_channel = 3
+  n_class = 3
+  X_shape = [3001, 1, n_channel]
+  Y_shape = [3001, 1, n_class]
 
   def __init__(self, **kwargs):
     for k,v in kwargs.items():
@@ -67,7 +67,7 @@ def crop_and_concat(net1, net2):
   out = tf.concat([net1, net2_resize], 3)
   out.set_shape([None, None, None, chn1+chn2])
 
-  return out 
+  return out
 
   # else:
   #     offsets = [0, (net1_shape[1] - net2_shape[1]) // 2, (net1_shape[2] - net2_shape[2]) // 2, 0]
@@ -251,7 +251,7 @@ class UNet:
                     training=self.is_training,
                     name="up_dropout0_{}".format(depth + 1))
 
-        
+
         #skip connection
         net = crop_and_concat(convs[depth], net)
         #net = crop_only(convs[depth], net)
@@ -298,7 +298,7 @@ class UNet:
       #                                    training=self.is_training,
       #                                    name="output_bn")
       output = net
-     
+
     with tf.compat.v1.variable_scope("representation"):
       self.representation = convs[-1]
 
@@ -334,16 +334,16 @@ class UNet:
       with tf.compat.v1.variable_scope("IOU"):
         eps = 1e-7
         loss = 0
-        for i in range(1, self.n_class): 
+        for i in range(1, self.n_class):
           intersection = eps + tf.reduce_sum(input_tensor=self.preds[:,:,:,i] * self.Y[:,:,:,i], axis=[1,2])
-          union = eps + tf.reduce_sum(input_tensor=self.preds[:,:,:,i], axis=[1,2]) + tf.reduce_sum(input_tensor=self.Y[:,:,:,i], axis=[1,2]) 
+          union = eps + tf.reduce_sum(input_tensor=self.preds[:,:,:,i], axis=[1,2]) + tf.reduce_sum(input_tensor=self.Y[:,:,:,i], axis=[1,2])
           loss += 1 - tf.reduce_mean(input_tensor=intersection / union)
     elif self.loss_type == "mean_squared":
       with tf.compat.v1.variable_scope("mean_squared"):
         flat_logits = tf.reshape(self.logits, [-1, self.n_class], name="logits")
         flat_labels = tf.reshape(self.Y, [-1, self.n_class], name="labels")
         with tf.compat.v1.variable_scope("mean_squared"):
-          loss = tf.compat.v1.losses.mean_squared_error(labels=flat_labels, predictions=flat_logits) 
+          loss = tf.compat.v1.losses.mean_squared_error(labels=flat_labels, predictions=flat_logits)
     else:
       raise ValueError("Unknown loss function: " % self.loss_type)
 
@@ -356,9 +356,9 @@ class UNet:
       with tf.compat.v1.name_scope('weight_loss'):
         tmp = tf.compat.v1.get_collection(tf.compat.v1.GraphKeys.REGULARIZATION_LOSSES)
         weight_loss = tf.add_n(tmp, name="weight_loss")
-      self.loss = loss + weight_loss 
+      self.loss = loss + weight_loss
     else:
-      self.loss = loss 
+      self.loss = loss
 
   def add_training_op(self):
     if self.optimizer == "momentum":
@@ -388,8 +388,8 @@ class UNet:
 
       Y= tf.argmax(input=self.Y, axis=-1)
       confusion_matrix = tf.cast(tf.math.confusion_matrix(
-          labels=tf.reshape(Y, [-1]), 
-          predictions=tf.reshape(self.preds, [-1]), 
+          labels=tf.reshape(Y, [-1]),
+          predictions=tf.reshape(self.preds, [-1]),
           num_classes=self.n_class, name='confusion_matrix'),
           dtype=tf.float32)
 
@@ -423,7 +423,7 @@ class UNet:
       tmp2 = tf.compat.v1.summary.scalar("valid_recall_s", recall_S)
       tmp3 = tf.compat.v1.summary.scalar("valid_f1_s", f1_S)
       self.summary_valid.extend([tmp1, tmp2, tmp3])
-      
+
       self.precision = [precision_P, precision_S]
       self.recall = [recall_P, recall_S]
       self.f1 = [f1_P, f1_S]
@@ -449,7 +449,7 @@ class UNet:
             self.Y: labels_batch,
             self.drop_rate: 0,
             self.is_training: False}
-            
+
     step_summary, step, loss, preds = sess.run([self.summary_valid,
                                                 self.global_step,
                                                 self.loss,
