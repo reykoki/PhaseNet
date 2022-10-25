@@ -1,4 +1,5 @@
 import tensorflow as tf
+import h5py
 
 tf.compat.v1.disable_eager_execution()
 tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.ERROR)
@@ -61,7 +62,7 @@ class DataConfig:
     min_event_gap = 3 * sampling_rate
     label_shape = "gaussian"
     label_width = 30
-    dtype = "float32"
+    dtype = "uint8"
 
     def __init__(self, **kwargs):
         for k, v in kwargs.items():
@@ -102,5 +103,25 @@ class DataReader:
         )
         dataset = dataset.batch(batch_size, drop_remainder=drop_remainder).prefetch(batch_size * 2)
         return dataset
+
+class generator:
+
+    def __init__(self, filename, ds_type, format="numpy", config=DataConfig(), **kwargs):
+
+        self.file = filename
+        self.ds_type = ds_type
+        self.dtype = config.dtype
+        self.X_shape = config.X_shape
+        self.Y_shape = config.Y_shape
+        self.config = config
+        self.num_data = 10000
+
+
+    def __call__(self):
+        with h5py.File(self.file) as hf:
+            for idx, X in enumerate(hf[self.ds_type]['X']):
+                wfs = np.reshape(X, self.X_shape)
+                labels = np.reshape(hf[self.ds_type]['y'][idx], self.Y_shape)
+                yield (wfs, labels)
 
 
