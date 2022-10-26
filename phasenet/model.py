@@ -7,7 +7,7 @@ warnings.filterwarnings('ignore', category=UserWarning)
 
 class ModelConfig:
 
-  batch_size = 20
+  batch_size = 512
   depths = 5
   filters_root = 8
   kernel_size = [7, 1]

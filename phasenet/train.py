@@ -20,7 +20,7 @@ def read_args():
 
     parser = argparse.ArgumentParser()
     parser.add_argument("--mode", default="train_valid", help="train/train_valid/test/debug")
-    parser.add_argument("--epochs", default=1, type=int, help="number of epochs (default: 10)")
+    parser.add_argument("--epochs", default=100, type=int, help="number of epochs (default: 10)")
     parser.add_argument("--batch_size", default=512, type=int, help="batch size")
     parser.add_argument("--learning_rate", default=0.01, type=float, help="learning rate")
     parser.add_argument("--drop_rate", default=0.0, type=float, help="dropout rate")
@@ -107,20 +107,26 @@ def train_fn(args, data_reader, data_reader_valid=None):
         for epoch in range(args.epochs):
             progressbar = tqdm(range(0, data_reader.num_data, args.batch_size), desc="{}: epoch {}".format(log_dir.split("/")[-1], epoch))
             for _ in progressbar:
-                loss_batch, _, _ = sess.run([model.loss, model.train_op, model.global_step],
-                                            feed_dict={model.drop_rate: args.drop_rate, model.is_training: True})
-                train_loss(loss_batch)
-                progressbar.set_description("{}: epoch {}, loss={:.6f}, mean={:.6f}".format(log_dir.split("/")[-1], epoch, loss_batch, train_loss.value))
+                try:
+                    loss_batch, _, _ = sess.run([model.loss, model.train_op, model.global_step],
+                                                feed_dict={model.drop_rate: args.drop_rate, model.is_training: True})
+                    train_loss(loss_batch)
+                    progressbar.set_description("{}: epoch {}, loss={:.6f}, mean={:.6f}".format(log_dir.split("/")[-1], epoch, loss_batch, train_loss.value))
+                except tf.errors.OutOfRangeError:
+                    print("End of dataset")
             flog.write("epoch: {}, mean loss: {}\n".format(epoch, train_loss.value))
 
             if data_reader_valid is not None:
                 valid_loss = LMA()
                 progressbar = tqdm(range(0, data_reader_valid.num_data, args.batch_size), desc="Valid:")
                 for _ in progressbar:
-                    loss_batch, preds_batch, X_batch, Y_batch, fname_batch = sess.run([model.loss, model.preds, valid_batch[0], valid_batch[1], valid_batch[2]],
-                                                                                       feed_dict={model.drop_rate: 0, model.is_training: False})
-                    valid_loss(loss_batch)
-                    progressbar.set_description("valid, loss={:.6f}, mean={:.6f}".format(loss_batch, valid_loss.value))
+                    try:
+                        loss_batch, _, _ = sess.run([model.loss, model.train_op, model.global_step],
+                                                    feed_dict={model.drop_rate: 0, model.is_training: False})
+                        valid_loss(loss_batch)
+                        progressbar.set_description("valid, loss={:.6f}, mean={:.6f}".format(loss_batch, valid_loss.value))
+                    except tf.errors.OutOfRangeError:
+                        print("End of dataset")
                 if valid_loss.value < best_valid_loss:
                     best_valid_loss = valid_loss.value
                     saver.save(sess, os.path.join(model_dir, "model_{}.ckpt".format(epoch)))
