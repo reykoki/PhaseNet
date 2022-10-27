@@ -65,7 +65,6 @@ def train_fn(args, data_reader, data_reader_valid=None):
     if not os.path.exists(figure_dir):
         os.makedirs(figure_dir)
 
-    #config = ModelConfig(X_shape=data_reader.X_shape, Y_shape=data_reader.Y_shape)
     config = ModelConfig(X_shape=[3001, 1, 3], Y_shape=[3001, 1, 3])
     if args.decay_step == -1:
         args.decay_step = data_reader.num_data // args.batch_size
@@ -76,6 +75,8 @@ def train_fn(args, data_reader, data_reader_valid=None):
     with tf.compat.v1.name_scope('Input_Batch'):
         dataset = data_reader.batch(args.batch_size, drop_remainder=True)
         batch = tf.compat.v1.data.make_one_shot_iterator(dataset).get_next()
+        print(batch.shape)
+
         if data_reader_valid is not None:
             dataset_valid = data_reader.batch(args.batch_size, drop_remainder=True)
             valid_batch = tf.compat.v1.data.make_one_shot_iterator(dataset_valid).get_next()
@@ -116,8 +117,8 @@ def train_fn(args, data_reader, data_reader_valid=None):
                 valid_loss = LMA()
                 progressbar = tqdm(range(0, data_reader_valid.num_data, args.batch_size), desc="Valid:")
                 for _ in progressbar:
-                    loss_batch, _, _ = sess.run([model.loss, model.train_op, model.global_step],
-                                                feed_dict={model.drop_rate: 0, model.is_training: False})
+                    loss_batch, preds_batch, X_batch, Y_batch = sess.run([model.loss, model.preds, batch[0], batch[1]],
+                                                                                      feed_dict={model.drop_rate: 0, model.is_training: False})
                     valid_loss(loss_batch)
                     progressbar.set_description("valid, loss={:.6f}, mean={:.6f}".format(loss_batch, valid_loss.value))
                 if valid_loss.value < best_valid_loss:
@@ -125,7 +126,7 @@ def train_fn(args, data_reader, data_reader_valid=None):
                     saver.save(sess, os.path.join(model_dir, "model_{}.ckpt".format(epoch)))
                 flog.write("Valid: mean loss: {}\n".format(valid_loss.value))
             else:
-                loss_batch, preds_batch, X_batch, Y_batch, fname_batch = sess.run([model.loss, model.preds, batch[0], batch[1], batch[2]],
+                loss_batch, preds_batch, X_batch, Y_batch = sess.run([model.loss, model.preds, batch[0], batch[1]],
                                                                                    feed_dict={model.drop_rate: 0, model.is_training: False})
                 saver.save(sess, os.path.join(model_dir, "model_{}.ckpt".format(epoch)))
 
@@ -215,8 +216,8 @@ def main(args):
     logging.basicConfig(format='%(asctime)s %(message)s', level=logging.INFO)
     coord = tf.train.Coordinator()
 
-    data_pwd = "/scratch/alpine/mecr8410/ML_seismo/wavelets/scripts/wave/dataset/subset.hdf5"
-    #data_pwd = "/scratch/alpine/mecr8410/ML_seismo/wavelets/scripts/wave/dataset/stead_wf_ds.hdf5"
+    #data_pwd = "/scratch/alpine/mecr8410/ML_seismo/wavelets/scripts/wave/dataset/subset.hdf5"
+    data_pwd = "/scratch/alpine/mecr8410/ML_seismo/wavelets/scripts/wave/dataset/stead_wf_ds.hdf5"
     f = h5py.File(data_pwd, 'r')
     if (args.mode == "train") or (args.mode == "train_valid"):
         with tf.compat.v1.name_scope('create_inputs'):

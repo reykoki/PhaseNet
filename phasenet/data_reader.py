@@ -121,8 +121,8 @@ class generator:
         while True:
             with h5py.File(self.file) as hf:
                 for idx, X in enumerate(hf[self.ds_type]['X']):
-                    wfs = np.reshape(X, self.X_shape)
-                    labels = np.reshape(hf[self.ds_type]['y'][idx], self.Y_shape)
+                    wfs = np.reshape(np.transpose(X), self.X_shape)
+                    labels = np.reshape(np.transpose(hf[self.ds_type]['y'][idx]), self.Y_shape)
                     yield (wfs, labels)
 
 
