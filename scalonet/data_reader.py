@@ -8,8 +8,8 @@ tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.ERROR)
 import logging
 import os
 
-def get_scaleo(wfs, scale_lim=33, waveletname = 'mexh'):
-    scales = np.arange(1, scale_lim)
+def get_scaleo(wfs, waveletname = 'mexh'):
+    scales = np.array([2.5, 3, 4, 5, 6, 8, 10, 15, 20, 30])
     all_powers = []
     for wf in wfs:
         all_powers.append(np.asarray(wf))
@@ -23,7 +23,8 @@ def get_scaleo(wfs, scale_lim=33, waveletname = 'mexh'):
         else:
             norm_power = 0*power
         all_powers.extend(np.array(norm_power))
-    return np.array(all_powers)
+    X_shape = 3*(len(scales) + 1)
+    return np.array(all_powers), X_shape
 
 def py_func_decorator(output_types=None, output_shapes=None, name=None):
     def decorator(func):
@@ -69,7 +70,7 @@ class DataConfig:
 
     seed = 123
     use_seed = True
-    n_channel = 99
+    n_channel = 33
     n_class = 3
     sampling_rate = 100
     dt = 1.0 / sampling_rate
@@ -104,7 +105,7 @@ class DataReader:
     def __getitem__(self, i):
         wfs = self.data['X'][i]
         labels = self.data['y'][i]
-        scalo = get_scaleo(wfs)
+        scalo, X_shape = get_scaleo(wfs)
         scalo = np.reshape(scalo, self.X_shape)
         labels = np.reshape(labels, self.Y_shape)
         return (scalo.astype(self.dtype), labels.astype(self.dtype), "basename")
