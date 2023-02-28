@@ -10,13 +10,14 @@ import os
 
 def get_scaleo(wfs, waveletname = 'mexh'):
     scales = np.array([2.5, 3, 4, 5, 6, 8, 10, 15, 20, 30])
+    #scales = np.array([2.5, 4, 5, 10, 20, 30])
     all_powers = []
     for wf in wfs:
         all_powers.append(np.asarray(wf))
         [coefficients, freq] = pywt.cwt(data=wf,
-        scales=scales,
-        wavelet=waveletname,
-        sampling_period=1/100)
+                                        scales=scales,
+                                        wavelet=waveletname,
+                                        sampling_period=1/100)
         power = np.log2(abs(coefficients)+1e-10)
         if np.max(power) - np.min(power) > 0:
             norm_power= (power - np.min(power)) / (np.max(power) - np.min(power))
@@ -106,7 +107,7 @@ class DataReader:
         wfs = self.data['X'][i]
         labels = self.data['y'][i]
         scalo, X_shape = get_scaleo(wfs)
-        scalo = np.reshape(scalo, self.X_shape)
+        scalo = np.reshape(np.transpose(scalo), self.X_shape)
         labels = np.reshape(labels, self.Y_shape)
         return (scalo.astype(self.dtype), labels.astype(self.dtype), "basename")
 
