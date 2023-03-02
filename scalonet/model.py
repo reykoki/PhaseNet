@@ -24,7 +24,7 @@ class ModelConfig:
   drop_rate = 0.0
   summary = True
 
-  n_channel = 99
+  n_channel = 33
   n_class = 3
   X_shape = [3001, 1, n_channel]
   Y_shape = [3001, 1, n_class]
