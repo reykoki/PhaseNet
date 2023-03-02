@@ -144,8 +144,6 @@ class generator:
                     scalo, X_shape = get_scaleo(X)
                     scalo = np.reshape(np.transpose(scalo), self.X_shape)
                     labels = np.reshape(np.transpose(hf[self.ds_type]['y'][idx]), self.Y_shape)
-                    print(scalo)
-                    x = input('stop')
                     yield (scalo, labels)
 
 
