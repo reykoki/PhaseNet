@@ -1,4 +1,5 @@
 import tensorflow as tf
+import h5py
 import pywt
 import scipy
 import numpy as np
@@ -121,5 +122,30 @@ class DataReader:
         )
         dataset = dataset.batch(batch_size, drop_remainder=drop_remainder).prefetch(batch_size * 2)
         return dataset
+
+
+class generator:
+
+    def __init__(self, filename, ds_type, format="numpy", config=DataConfig(), **kwargs):
+
+        self.file = filename
+        self.ds_type = ds_type
+        self.dtype = config.dtype
+        self.X_shape = config.X_shape
+        self.Y_shape = config.Y_shape
+        self.config = config
+        self.num_data = 10000
+
+
+    def __call__(self):
+        while True:
+            with h5py.File(self.file) as hf:
+                for idx, X in enumerate(hf[self.ds_type]['X']):
+                    scalo, X_shape = get_scaleo(X)
+                    scalo = np.reshape(np.transpose(scalo), self.X_shape)
+                    labels = np.reshape(np.transpose(hf[self.ds_type]['y'][idx]), self.Y_shape)
+                    print(scalo)
+                    x = input('stop')
+                    yield (scalo, labels)
 
 

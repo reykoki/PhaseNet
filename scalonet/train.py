@@ -10,7 +10,7 @@ import multiprocessing
 from functools import partial
 import pickle
 from model import UNet, ModelConfig
-from data_reader import DataReader
+from data_reader import generator
 from postprocess import extract_picks, save_picks, save_picks_json, extract_amplitude, convert_true_picks, calc_performance
 from visulization import plot_waveform
 from util import EMA, LMA
@@ -20,7 +20,7 @@ def read_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("--mode", default="train_valid", help="train/train_valid/test/debug")
     parser.add_argument("--epochs", default=100, type=int, help="number of epochs (default: 10)")
-    parser.add_argument("--batch_size", default=512, type=int, help="batch size")
+    parser.add_argument("--batch_size", default=1, type=int, help="batch size")
     parser.add_argument("--learning_rate", default=0.01, type=float, help="learning rate")
     parser.add_argument("--drop_rate", default=0.0, type=float, help="dropout rate")
     parser.add_argument("--decay_step", default=-1, type=int, help="decay step")
@@ -64,7 +64,7 @@ def train_fn(args, data_reader, data_reader_valid=None):
     if not os.path.exists(figure_dir):
         os.makedirs(figure_dir)
 
-    config = ModelConfig(X_shape=data_reader.X_shape, Y_shape=data_reader.Y_shape)
+    config = ModelConfig(X_shape=[3001, 1, 6], Y_shape=[3001, 1, 3])
     if args.decay_step == -1:
         args.decay_step = data_reader.num_data // args.batch_size
     config.update_args(args)
@@ -72,10 +72,10 @@ def train_fn(args, data_reader, data_reader_valid=None):
         fp.write('\n'.join("%s: %s" % item for item in vars(config).items()))
 
     with tf.compat.v1.name_scope('Input_Batch'):
-        dataset = data_reader.dataset(args.batch_size, shuffle=True).repeat()
+        dataset = data_reader.batch(args.batch_size, drop_remainder=True)
         batch = tf.compat.v1.data.make_one_shot_iterator(dataset).get_next()
         if data_reader_valid is not None:
-            dataset_valid = data_reader_valid.dataset(args.batch_size, shuffle=False).repeat()
+            dataset_valid = data_reader.batch(args.batch_size, drop_remainder=True)
             valid_batch = tf.compat.v1.data.make_one_shot_iterator(dataset_valid).get_next()
 
     model = UNet(config, input_batch=batch)
@@ -110,13 +110,12 @@ def train_fn(args, data_reader, data_reader_valid=None):
                 train_loss(loss_batch)
                 progressbar.set_description("{}: epoch {}, loss={:.6f}, mean={:.6f}".format(log_dir.split("/")[-1], epoch, loss_batch, train_loss.value))
             flog.write("epoch: {}, mean loss: {}\n".format(epoch, train_loss.value))
-
             if data_reader_valid is not None:
                 valid_loss = LMA()
                 progressbar = tqdm(range(0, data_reader_valid.num_data, args.batch_size), desc="Valid:")
                 for _ in progressbar:
-                    loss_batch, preds_batch, X_batch, Y_batch, fname_batch = sess.run([model.loss, model.preds, valid_batch[0], valid_batch[1], valid_batch[2]],
-                                                                                       feed_dict={model.drop_rate: 0, model.is_training: False})
+                    loss_batch, preds_batch, X_batch, Y_batch = sess.run([model.loss, model.preds, batch[0], batch[1]],
+                                                                                      feed_dict={model.drop_rate: 0, model.is_training: False})
                     valid_loss(loss_batch)
                     progressbar.set_description("valid, loss={:.6f}, mean={:.6f}".format(loss_batch, valid_loss.value))
                 if valid_loss.value < best_valid_loss:
@@ -124,7 +123,7 @@ def train_fn(args, data_reader, data_reader_valid=None):
                     saver.save(sess, os.path.join(model_dir, "model_{}.ckpt".format(epoch)))
                 flog.write("Valid: mean loss: {}\n".format(valid_loss.value))
             else:
-                loss_batch, preds_batch, X_batch, Y_batch, fname_batch = sess.run([model.loss, model.preds, batch[0], batch[1], batch[2]],
+                loss_batch, preds_batch, X_batch, Y_batch = sess.run([model.loss, model.preds, batch[0], batch[1]],
                                                                                    feed_dict={model.drop_rate: 0, model.is_training: False})
                 saver.save(sess, os.path.join(model_dir, "model_{}.ckpt".format(epoch)))
 
@@ -214,20 +213,30 @@ def main(args):
     logging.basicConfig(format='%(asctime)s %(message)s', level=logging.INFO)
     coord = tf.train.Coordinator()
 
-    data_pwd = "/scratch/alpine/mecr8410/ML_seismo/wavelets/scripts/wave/dataset/subset.hdf5"
-    #data_pwd = "/scratch/alpine/mecr8410/ML_seismo/wavelets/scripts/wave/dataset/stead_wf_ds.hdf5"
+    #data_pwd = "/scratch/alpine/mecr8410/ML_seismo/wavelets/scripts/wave/dataset/subset.hdf5"
+    data_pwd = "/scratch/alpine/mecr8410/ML_seismo/wavelets/scripts/wave/dataset/ds_wf.hdf5"
     f = h5py.File(data_pwd, 'r')
     if (args.mode == "train") or (args.mode == "train_valid"):
         with tf.compat.v1.name_scope('create_inputs'):
-            data_reader = DataReader(f['train'],
-                                   format=args.format,
-                                   data_dir=args.train_dir,
-                                   data_list=args.train_list)
+            #data_reader = DataReader(f['train'],
+            #                       format=args.format,
+            #                       data_dir=args.train_dir,
+            #                       data_list=args.train_list)
+            data_reader = tf.data.Dataset.from_generator(
+                                                        generator(data_pwd, 'train'),
+
+                                                        output_signature = (tf.TensorSpec(shape=(3001,1,33), dtype=tf.float32),
+                                                        tf.TensorSpec(shape=(3001,1,3), dtype=tf.float32)))
+
+            data_reader.num_data = len(f['train']['X'])
             if args.mode == "train_valid":
-                data_reader_valid = DataReader(f['val'],
-                                               format=args.format,
-                                               data_dir=args.valid_dir,
-                                               data_list=args.valid_list)
+                data_reader_valid = tf.data.Dataset.from_generator(
+                                                            generator(data_pwd, 'valid'),
+
+                                                            output_signature = (tf.TensorSpec(shape=(3001,1,33), dtype=tf.float32),
+                                                            tf.TensorSpec(shape=(3001,1,3), dtype=tf.float32)))
+                data_reader_valid.num_data = len(f['val']['X'])
+                f.close()
                 logging.info("Dataset size: train {}, valid {}".format(data_reader.num_data, data_reader_valid.num_data))
             else:
                 data_reader_valid = None
