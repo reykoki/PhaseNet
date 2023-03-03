@@ -9,7 +9,7 @@ class ModelConfig:
 
   batch_size = 20
   depths = 5
-  filters_root = 8
+  filters_root = 64
   kernel_size = [7, 1]
   pool_size = [4, 1]
   dilation_rate = [1, 1]

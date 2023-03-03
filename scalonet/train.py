@@ -20,7 +20,7 @@ def read_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("--mode", default="train_valid", help="train/train_valid/test/debug")
     parser.add_argument("--epochs", default=100, type=int, help="number of epochs (default: 10)")
-    parser.add_argument("--batch_size", default=1, type=int, help="batch size")
+    parser.add_argument("--batch_size", default=512, type=int, help="batch size")
     parser.add_argument("--learning_rate", default=0.01, type=float, help="learning rate")
     parser.add_argument("--drop_rate", default=0.0, type=float, help="dropout rate")
     parser.add_argument("--decay_step", default=-1, type=int, help="decay step")
